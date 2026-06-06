@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     }
 
     // Check if user exists
-    const userExists = await pool.query('SELECT * FROM users WHERE usersNAME = $1', [username]);
+    const userExists = await pool.query('SELECT * FROM users WHERE usersname = $1', [username]);
     if (userExists.rows.length > 0) {
       return Response.json({ success: false, message: 'Username already taken' }, { status: 400 });
     }
@@ -20,11 +20,11 @@ export async function POST(request: Request) {
 
     // Insert user
     await pool.query(
-      'INSERT INTO users (usersNAME, usersEMAIL, usersPWD) VALUES ($1, $2, $3)',
+      'INSERT INTO users (usersname, usersemail, userspwd) VALUES ($1, $2, $3)',
       [username, email, hashedPassword]
     );
 
-    return Response.json({ success: true, username });
+    return Response.json({ success: true, username, xp: 0 });
   } catch (error: any) {
     console.error('Signup error:', error);
     return Response.json({ success: false, message: 'Database error' }, { status: 500 });
