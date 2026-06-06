@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return Response.json({ success: false, message: 'Missing fields' }, { status: 400 });
     }
 
-    // Check if user exists
+    // Check if user exists (case insensitive check using ILIKE if preferred, but standard match for now)
     const userExists = await pool.query('SELECT * FROM users WHERE usersname = $1', [username]);
     if (userExists.rows.length > 0) {
       return Response.json({ success: false, message: 'Username already taken' }, { status: 400 });
@@ -18,10 +18,10 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insert user
+    // Insert user - using correct lowercase column names
     await pool.query(
-      'INSERT INTO users (usersname, usersemail, userspwd) VALUES ($1, $2, $3)',
-      [username, email, hashedPassword]
+      'INSERT INTO users (usersname, usersemail, userspwd, usersxp, usersbio, usersavatar) VALUES ($1, $2, $3, $4, $5, $6)',
+      [username, email, hashedPassword, 0, 'No bio yet.', 'avatar1.svg']
     );
 
     return Response.json({ success: true, username, xp: 0 });
