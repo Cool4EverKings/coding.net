@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -7,33 +6,35 @@ export async function GET(request: Request) {
     const username = searchParams.get('username');
 
     if (!username) {
-      return NextResponse.json({ success: false, message: 'Missing username' }, { status: 400 });
+      return Response.json({ success: false, message: 'Missing username' }, { status: 400 });
     }
 
-    const user: any = db.prepare('SELECT usersNAME, usersXP, usersBIO, usersAVATAR FROM users WHERE usersNAME = ?').get(username);
+    const result = await pool.query('SELECT usersNAME, usersXP, usersBIO, usersAVATAR FROM users WHERE usersNAME = $1', [username]);
     
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+    if (result.rows.length === 0) {
+      return Response.json({ success: false, message: 'User not found' }, { status: 404 });
     }
+
+    const user = result.rows[0];
 
     // Formula: Level = floor(sqrt(XP / 100)) + 1
-    const xp = user.usersXP || 0;
+    const xp = user.usersxp || 0;
     const level = Math.floor(Math.sqrt(xp / 100)) + 1;
     const nextLevelXP = Math.pow(level, 2) * 100;
     const currentLevelBaseXP = Math.pow(level - 1, 2) * 100;
     const progress = ((xp - currentLevelBaseXP) / (nextLevelXP - currentLevelBaseXP)) * 100;
 
-    return NextResponse.json({ 
+    return Response.json({ 
       success: true, 
-      username: user.usersNAME,
+      username: user.usersname,
       xp: xp, 
-      bio: user.usersBIO || "No bio yet.",
-      avatar: user.usersAVATAR || "avatar1.png",
+      bio: user.usersbio || "No bio yet.",
+      avatar: user.usersavatar || "avatar1.svg",
       level: level,
       progress: Math.min(100, Math.max(0, progress))
     });
   } catch (error) {
-    return NextResponse.json({ success: false, message: 'Database error' }, { status: 500 });
+    return Response.json({ success: false, message: 'Database error' }, { status: 500 });
   }
 }
 
@@ -42,14 +43,13 @@ export async function POST(request: Request) {
     const { username, bio, avatar } = await request.json();
 
     if (!username) {
-      return NextResponse.json({ success: false, message: 'Missing username' }, { status: 400 });
+      return Response.json({ success: false, message: 'Missing username' }, { status: 400 });
     }
 
-    db.prepare('UPDATE users SET usersBIO = ?, usersAVATAR = ? WHERE usersNAME = ?')
-      .run(bio, avatar, username);
+    await pool.query('UPDATE users SET usersBIO = $1, usersAVATAR = $2 WHERE usersNAME = $3', [bio, avatar, username]);
 
-    return NextResponse.json({ success: true });
+    return Response.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ success: false, message: 'Database error' }, { status: 500 });
+    return Response.json({ success: false, message: 'Database error' }, { status: 500 });
   }
 }

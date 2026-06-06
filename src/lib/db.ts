@@ -1,7 +1,11 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { Pool } from 'pg';
 
-const dbPath = path.join(process.cwd(), 'database.db');
-const db = new Database(dbPath);
+// Using a connection string from environment variables
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // Required for Neon
+  },
+});
 
-export default db;
+export default pool;

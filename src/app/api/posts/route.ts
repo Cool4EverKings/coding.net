@@ -1,18 +1,17 @@
-import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 
 export async function GET() {
   try {
-    const rows = db.prepare(`
+    const result = await pool.query(`
       SELECT posts.*, users.usersAVATAR 
       FROM posts 
       LEFT JOIN users ON posts.postsUSER = users.usersNAME 
       ORDER BY postsID DESC
-    `).all();
-    return NextResponse.json(rows);
+    `);
+    return Response.json(result.rows);
   } catch (error: any) {
     console.error('Fetch posts error:', error);
-    return NextResponse.json({ success: false, message: 'Database error' }, { status: 500 });
+    return Response.json({ success: false, message: 'Database error' }, { status: 500 });
   }
 }
 
@@ -21,15 +20,15 @@ export async function POST(request: Request) {
     const { content, username } = await request.json();
 
     if (!content || !username) {
-      return NextResponse.json({ success: false, message: 'Missing fields' }, { status: 400 });
+      return Response.json({ success: false, message: 'Missing fields' }, { status: 400 });
     }
 
-    db.prepare('INSERT INTO posts (postsCONTENT, postsUSER) VALUES (?, ?)').run(content, username);
-    db.prepare('UPDATE users SET usersXP = usersXP + 50 WHERE usersNAME = ?').run(username);
+    await pool.query('INSERT INTO posts (postsCONTENT, postsUSER) VALUES ($1, $2)', [content, username]);
+    await pool.query('UPDATE users SET usersXP = usersXP + 50 WHERE usersNAME = $1', [username]);
 
-    return NextResponse.json({ success: true });
+    return Response.json({ success: true });
   } catch (error: any) {
     console.error('Create post error:', error);
-    return NextResponse.json({ success: false, message: 'Database error' }, { status: 500 });
+    return Response.json({ success: false, message: 'Database error' }, { status: 500 });
   }
 }
