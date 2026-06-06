@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -10,14 +10,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, message: 'Missing username' }, { status: 400 });
     }
 
-    const user: any = db.prepare('SELECT usersXP FROM users WHERE usersNAME = ?').get(username);
+    const result = await pool.query('SELECT usersXP FROM users WHERE usersNAME = $1', [username]);
     
-    if (!user) {
+    if (result.rows.length === 0) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
     }
 
+    const user = result.rows[0];
+
     // Formula: Level = floor(sqrt(XP / 100)) + 1
-    const xp = user.usersXP || 0;
+    const xp = user.usersxp || 0;
     const level = Math.floor(Math.sqrt(xp / 100)) + 1;
     const nextLevelXP = Math.pow(level, 2) * 100;
     const currentLevelBaseXP = Math.pow(level - 1, 2) * 100;
