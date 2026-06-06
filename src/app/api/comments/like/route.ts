@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import db from '@/lib/db';
+import pool from '@/lib/db';
 
 export async function POST(request: Request) {
   try {
@@ -10,23 +10,26 @@ export async function POST(request: Request) {
     }
 
     // Check if already liked
-    const alreadyLiked = db.prepare('SELECT * FROM comment_likes WHERE commentID = ? AND username = ?').get(commentId, username);
+    const alreadyLiked = await pool.query('SELECT * FROM comment_likes WHERE commentID = $1 AND username = $2', [commentId, username]);
 
-    if (alreadyLiked) {
-      // If already liked, we'll "unlike" it (toggle behavior is often preferred)
-      // But the user said "each user can only do it once", so I'll just prevent multiple likes.
-      // Or I could return an error. Let's do: if liked, do nothing or return a message.
+    if (alreadyLiked.rows.length > 0) {
       return NextResponse.json({ success: false, message: 'Already liked' }, { status: 400 });
     }
 
-    // Transaction for atomicity
-    const transaction = db.transaction(() => {
-      db.prepare('INSERT INTO comment_likes (commentID, username) VALUES (?, ?)').run(commentId, username);
-      db.prepare('UPDATE comments SET commentsLIKES = commentsLIKES + 1 WHERE commentsID = ?').run(commentId);
-      db.prepare('UPDATE users SET usersXP = usersXP + 10 WHERE usersNAME = ?').run(username);
-    });
-
-    transaction();
+    // Transactional-like behavior using a client
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('INSERT INTO comment_likes (commentID, username) VALUES ($1, $2)', [commentId, username]);
+      await client.query('UPDATE comments SET commentsLIKES = commentsLIKES + 1 WHERE commentsID = $1', [commentId]);
+      await client.query('UPDATE users SET usersXP = usersXP + 10 WHERE usersNAME = $1', [username]);
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
